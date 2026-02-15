@@ -159,7 +159,22 @@ services:
     mem_limit: 512m
     networks:
       - db-stream-network
-
+    volumes:
+      - ./debezium/connectors:/connectors
+    # command: >
+    #   "for file in /connectors/*.json; do
+    #     echo 'Registering $file...'
+    #     curl -X POST -H 'Content-Type: application/json' --data @$file http://debezium:8083/connectors
+    #   done"
+    command: >
+          "for file in /connectors/*.json; do
+            name=$$(basename \"$$file\" .json);
+            echo \"Applying config for connector: $$name\";
+            curl -s -X PUT -H 'Content-Type: application/json' \
+                --data @\"$$file\" \
+                http://debezium:8083/connectors/$$name/config;
+            echo \"\n\";
+          done"
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: db-stream-kafka-ui

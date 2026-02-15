@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<yandex>
+    <profiles>
+        <default>
+            <max_memory_usage_for_all_queries>101310968832</max_memory_usage_for_all_queries>
+            <max_bytes_before_external_group_by>50655484416</max_bytes_before_external_group_by>
+            <max_memory_usage>101310968832</max_memory_usage>
+        </default>
+    </profiles>
+</yandex>

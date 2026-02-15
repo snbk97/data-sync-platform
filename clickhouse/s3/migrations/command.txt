@@ -1,0 +1,1 @@
+GOOSE_DRIVER=clickhouse GOOSE_DBSTRING="http://default@localhost:8123/db_stream_analytics" goose up

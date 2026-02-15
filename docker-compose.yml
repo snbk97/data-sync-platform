@@ -1,0 +1,227 @@
+# version: '3.8'
+
+services:
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: db-stream-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - db-stream-network
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka for event streaming
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: db-stream-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"
+    networks:
+      - db-stream-network
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ClickHouse for analytics
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    hostname: clickhouse
+    container_name: db-stream-clickhouse
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    env_file:
+      - .env
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      # AWS credentials for S3Queue/S3 (from .env; not committed)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    networks:
+      - db-stream-network
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/config.d/zookeeper.xml:/etc/clickhouse-server/config.d/zookeeper.xml:ro
+      - ./clickhouse/users.d/experimental.xml:/etc/clickhouse-server/users.d/experimental.xml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL for CDC source
+  postgres:
+    image: postgres:15-alpine
+    hostname: postgres
+    container_name: db-stream-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: db_stream_source
+      POSTGRES_USER: db_stream
+      POSTGRES_PASSWORD: db_stream_password
+    networks:
+      - db-stream-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/postgres-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U db_stream -d db_stream_source"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MySQL for CDC source (using MariaDB for lower memory footprint)
+  mysql:
+    image: mariadb:10.11
+    hostname: mysql
+    container_name: db-stream-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: db_stream_source
+      MYSQL_USER: db_stream
+      MYSQL_PASSWORD: db_stream_password
+    networks:
+      - db-stream-network
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql
+    command: --server-id=1 --log-bin=mysql-bin --binlog-format=ROW
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Debezium Connector for CDC
+  debezium:
+    image: debezium/connect:2.4
+    hostname: debezium
+    container_name: db-stream-debezium
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: debezium-connect-cluster
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      HEAP_OPTS: "-Xms128M -Xmx256M"
+    mem_limit: 512m
+    networks:
+      - db-stream-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: db-stream-kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8091:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: db-stream-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - db-stream-network
+    restart: unless-stopped
+
+
+
+  # Redis for caching
+  # redis:
+  #   image: redis:7-alpine
+  #   hostname: redis
+  #   container_name: db-stream-redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - db-stream-network
+  #   volumes:
+  #     - redis-data:/data
+
+  # Kafka UI for monitoring  # Grafana for monitoring
+  # grafana:
+  #   image: grafana/grafana:10.0.0
+  #   hostname: grafana
+  #   container_name: db-stream-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #   networks:
+  #     - db-stream-network
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #     - ./configs/grafana:/etc/grafana/provisioning
+
+networks:
+  db-stream-network:
+    driver: bridge
+
+volumes:
+  zookeeper-data:
+    driver: local
+  zookeeper-logs:
+    driver: local
+  kafka-data:
+    driver: local
+  clickhouse-data:
+    driver: local
+  postgres-data:
+    driver: local
+  mysql-data:
+    driver: local
+  # redis-data:
+  #   driver: local
+  # grafana-data:
+  #   driver: local

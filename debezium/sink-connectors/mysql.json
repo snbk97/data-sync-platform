@@ -1,0 +1,27 @@
+{
+    "name": "mysql-sink",
+    "config": {
+        "connector.class": "com.altinity.clickhouse.sink.connector.ClickHouseSinkConnector",
+        "tasks.max": "1",
+        "topics.regex": "mysql_employee_mirror\\.employee\\..*",
+        "clickhouse.topic2table.map": "mysql_employee_mirror.employee.employee:employee,mysql_employee_mirror.employee.department:department,mysql_employee_mirror.employee.dept_emp:dept_emp,mysql_employee_mirror.employee.dept_manager:dept_manager,mysql_employee_mirror.employee.salary:salary,mysql_employee_mirror.employee.title:title,mysql_employee_mirror.employee.expected_value:expected_value",
+        "clickhouse.server.url": "clickhouse",
+        "clickhouse.server.port": "8123",
+        "clickhouse.server.user": "default",
+        "clickhouse.server.password": "",
+        "clickhouse.server.database": "mysql_employee_mirror",
+        "auto.create.tables": "true",
+        "schema.evolution": "true",
+        "replacingmergetree.delete.column": "_sign",
+        "errors.tolerance": "all",
+        "errors.log.enable": "true",
+        "errors.log.include.messages": "true",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "true",
+        "value.converter.schemas.enable": "true",
+        "buffer.flush.time.ms": "10000",
+        "buffer.max.records": "10000",
+        "thread.pool.size": "2"
+    }
+}

@@ -17,7 +17,7 @@ services:
       - zookeeper-data:/var/lib/zookeeper/data
       - zookeeper-logs:/var/lib/zookeeper/log
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      test: [ "CMD", "nc", "-z", "localhost", "2181" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +52,7 @@ services:
       - kafka-data:/var/lib/kafka/data
     mem_limit: 1g
     healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      test: [ "CMD-SHELL", "/usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -83,7 +83,7 @@ services:
       - ./clickhouse/config.d/zookeeper.xml:/etc/clickhouse-server/config.d/zookeeper.xml:ro
       - ./clickhouse/users.d/experimental.xml:/etc/clickhouse-server/users.d/experimental.xml:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -105,12 +105,11 @@ services:
       - postgres-data:/var/lib/postgresql/data
       # - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/postgres-init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U db_stream -d db_stream_source"]
+      test: [ "CMD-SHELL", "pg_isready -U db_stream -d db_stream_source" ]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # MySQL for CDC source (using MariaDB for lower memory footprint)
   mysql:
     image: mariadb:10.11
     hostname: mysql
@@ -119,18 +118,17 @@ services:
       - "3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: db_stream_source
+      MYSQL_DATABASE: employee
       MYSQL_USER: db_stream
       MYSQL_PASSWORD: db_stream_password
     networks:
       - db-stream-network
     volumes:
       - mysql-data:/var/lib/mysql
-      # - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql
-    command: --server-id=1 --log-bin=mysql-bin --binlog-format=ROW
+    command: --server-id=1 --log-bin=mysql-bin --binlog-format=ROW # set this also in db--binlog_row_metadata=FULL ## this should persist on the db itself
     mem_limit: 256m
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -159,6 +157,105 @@ services:
     mem_limit: 512m
     networks:
       - db-stream-network
+      # volumes:
+      #   - ./debezium/connectors:/connectors
+      # extra_hosts:
+      #   - "host.docker.internal:host-gateway"
+      # command: >
+      #   "for file in /connectors/*.json; do
+      #     echo 'Registering $file...'
+      #     curl -X POST -H 'Content-Type: application/json' --data @$file http://debezium:8083/connectors
+      #   done"
+      # command: >
+      #       "for file in /connectors/*.json; do
+      #         name=$$(basename \"$$file\" .json);
+      #         echo \"Applying config for connector: $$name\";
+      #         curl -s -X PUT -H 'Content-Type: application/json' \
+      #             --data @\"$$file\" \
+      #             http://debezium:8083/connectors/$$name/config;
+      #         echo \"\n\";
+      # done"
+
+  clickhouse-sink:
+    build:
+      context: ./debezium/clickhouse-sink
+      dockerfile: Dockerfile
+    image: db-stream-clickhouse-sink:local
+    container_name: db-stream-clickhouse-sink
+    platform: linux/amd64
+    mem_limit: 2g
+    ports:
+      - "8084:8083"
+    environment:
+      - KAFKA_HEAP_OPTS=-Xms512M -Xmx1024M
+      - GROUP_ID=clickhouse-sink-connect-cluster
+      # - internal topics for state management,for single node config, not sure about multi node or replicated nodes.
+      - CONFIG_STORAGE_TOPIC=clickhouse_sink_connect_configs
+      - OFFSET_STORAGE_TOPIC=clickhouse_sink_connect_offsets
+      - STATUS_STORAGE_TOPIC=clickhouse_sink_connect_statuses
+      - CONFIG_STORAGE_REPLICATION_FACTOR=1
+      - OFFSET_STORAGE_REPLICATION_FACTOR=1
+      - STATUS_STORAGE_REPLICATION_FACTOR=1
+
+      - CLICKHOUSE_SERVER_URL=http://clickhouse:8123
+      - CLICKHOUSE_SERVER_USER=default
+      - CLICKHOUSE_SERVER_PASSWORD=
+      # - CLICKHOUSE_SERVER_PORT=8123
+      - CLICKHOUSE_SERVER_DATABASE=mysql_employee_mirror
+      - BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BROKERS=kafka:29092
+      - CLICKHOUSE_TOPICS_REGEX=(mysql_employee_mirror|pg_orion_mirror|pg_sirius_mirror)\..*
+      - DEBEZIUM_TOPIC_PREFIX=mysql_employee_mirror
+      - REPLACINGMERGETREE_DELETE_COLUMN=__deleted
+      - AUTO_CREATE_TABLES=true
+      - SCHEMA_EVOLUTION=true
+      - MAP_JSON_AS_STRING=true
+      - MAP_UUID_AS_STRING=true
+      # --- State Management (Required for restarts) ---
+      # Stores which Kafka messages were already processed inside ClickHouse
+      - OFFSET_STORAGE_JDBC_URL=jdbc:clickhouse://clickhouse:8123/altinity_sink_connector
+      - OFFSET_STORAGE_JDBC_USER=default
+      - OFFSET_STORAGE_JDBC_PASSWORD=
+    networks:
+      - db-stream-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8083/ || exit 1" ]
+      interval: 20s
+      timeout: 15s
+      retries: 12
+      start_period: 600s
+
+  # sink-init:
+  #   image: curlimages/curl:latest
+  #   container_name: db-stream-sink-init
+  #   networks:
+  #     - db-stream-network
+  #   volumes:
+  #     - ./debezium/sink-connectors:/config-files:ro
+  #   depends_on:
+  #     clickhouse-sink:
+  #       condition: service_healthy
+  #   entrypoint: [ "/bin/sh", "-c" ]
+  #   command:
+  #     - |
+  #       echo "Waiting for Kafka Connect to be ready..."
+  #       until curl -s http://clickhouse-sink:8083/connectors > /dev/null; do
+  #         sleep 2
+  #       done
+
+  #       echo "Looping through configuration files in /config-files..."
+  #       for file in /config-files/*.json; do
+  #         [ -f "$$file" ] || continue
+  #         echo "Submitting $$file..."
+  #         ls -la /config-files 
+  #         curl -s -X POST http://clickhouse-sink:8083/connectors \
+  #           -H "Content-Type: application/json" \
+  #           -d @"$$file"
+  #         echo -e "\nFinished $$file"
+  #       done
+  #       echo "All connectors submitted."
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -174,9 +271,6 @@ services:
     networks:
       - db-stream-network
     restart: unless-stopped
-
-
-
   # Redis for caching
   # redis:
   #   image: redis:7-alpine

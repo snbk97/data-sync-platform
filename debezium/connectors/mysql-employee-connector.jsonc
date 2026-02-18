@@ -1,0 +1,28 @@
+{
+    "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+    "database.hostname": "mysql",
+    "database.port": "3306",
+    "database.user": "db_stream",
+    "database.password": "db_stream_password",
+    "database.server.id": "184054", // fixed value from 1 to 4294967295, 0 is invalid
+    "topic.prefix": "mysql_employee_mirror",
+    "database.include.list": "employee",
+    "include.schema.changes": "true",
+    "topic.creation.enable": "true",
+    "snapshot.mode": "initial",
+    "schema.history.internal.kafka.topic": "mysql_employee_mirror.schema-history",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:29092",
+    "schema.history.internal.kafka.recovery.poll.interval.ms": "5000",
+    "topic.creation.default.replication.factor": 1,
+    "topic.creation.default.partitions": 1,
+    "schema.history.internal.replication.factor": 1,
+    "heartbeat.interval.ms": "30000",
+    "decimal.handling.mode": "double",
+    "max.queue.size": "8192",
+    "errors.tolerance": "all",
+    "errors.deadletterqueue.topic.name": "mysql_employee_mirror.dlq",
+    "errors.deadletterqueue.topic.replication.factor": 1,
+    "errors.deadletterqueue.context.headers.enable": true,
+    "errors.retry.delay.max.ms": 60000,
+    "errors.retry.timeout": 300000
+}

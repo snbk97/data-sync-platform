@@ -1,0 +1,12 @@
+{
+    "name": "postgres-sink",
+    "config": {
+        "connector.class": "com.altinity.clickhouse.sink.connector.ClickHouseSinkConnector",
+        "tasks.max": "5",
+        "topics.regex": "pg_.*_mirror\\..*",
+        "clickhouse.server.url": "clickhouse",
+        "clickhouse.server.database": "mirror_postgres",
+        "auto.create.tables": "true",
+        "schema.evolution": "true"
+    }
+}

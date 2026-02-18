@@ -37,3 +37,6 @@ echo "--- Finished ---"
 
 
 # curl -s -X PUT -H "Content-Type: application/json" --data @debezium/connectors/mysql-employee-connector.json http://localhost:8083/connectors/mysql-employee-connector/config
+
+
+# curl -s -X PUT -H "Content-Type: application/json" --data @debezium/sink-connectors/mysql.json http://localhost:8084/connectors/mysql-sink/config

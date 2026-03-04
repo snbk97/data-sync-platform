@@ -88,27 +88,27 @@ services:
       timeout: 10s
       retries: 3
 
-  # PostgreSQL for CDC source
-  postgres:
-    image: postgres:15-alpine
-    hostname: postgres
-    container_name: db-stream-postgres
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_DB: db_stream_source
-      POSTGRES_USER: db_stream
-      POSTGRES_PASSWORD: db_stream_password
-    networks:
-      - db-stream-network
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      # - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/postgres-init.sql
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U db_stream -d db_stream_source" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # # PostgreSQL for CDC source
+  # postgres:
+  #   image: postgres:15-alpine
+  #   hostname: postgres
+  #   container_name: db-stream-postgres
+  #   ports:
+  #     - "5433:5432"
+  #   environment:
+  #     POSTGRES_DB: db_stream_source
+  #     POSTGRES_USER: db_stream
+  #     POSTGRES_PASSWORD: db_stream_password
+  #   networks:
+  #     - db-stream-network
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #     # - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/postgres-init.sql
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_isready -U db_stream -d db_stream_source" ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
   mysql:
     image: mariadb:10.11
@@ -212,10 +212,10 @@ services:
       - MAP_JSON_AS_STRING=true
       - MAP_UUID_AS_STRING=true
       # --- State Management (Required for restarts) ---
-      # Stores which Kafka messages were already processed inside ClickHouse
-      - OFFSET_STORAGE_JDBC_URL=jdbc:clickhouse://clickhouse:8123/altinity_sink_connector
-      - OFFSET_STORAGE_JDBC_USER=default
-      - OFFSET_STORAGE_JDBC_PASSWORD=
+      # # Stores which Kafka messages were already processed inside ClickHouse
+      # - OFFSET_STORAGE_JDBC_URL=jdbc:clickhouse://clickhouse:8123/altinity_sink_connector
+      # - OFFSET_STORAGE_JDBC_USER=default
+      # - OFFSET_STORAGE_JDBC_PASSWORD=
     networks:
       - db-stream-network
     extra_hosts:
@@ -311,10 +311,10 @@ volumes:
     driver: local
   clickhouse-data:
     driver: local
-  postgres-data:
-    driver: local
   mysql-data:
     driver: local
+  # postgres-data:
+  #   driver: local
   # redis-data:
   #   driver: local
   # grafana-data:

@@ -1,0 +1,26 @@
+{
+    "name": "pg-orion-sink",
+    "config": {
+        "connector.class": "com.altinity.clickhouse.sink.connector.ClickHouseSinkConnector",
+        "tasks.max": "1",
+        "topics.regex": "pg_orion_mirror\\.public\\..*",
+        "clickhouse.server.url": "clickhouse",
+        "clickhouse.server.port": "8123",
+        "clickhouse.server.user": "default",
+        "clickhouse.server.password": "",
+        "clickhouse.server.database": "pg_orion_mirror",
+        "auto.create.tables": "true",
+        "schema.evolution": "true",
+        "replacingmergetree.delete.column": "_sign",
+        "errors.tolerance": "all",
+        "errors.log.enable": "true",
+        "errors.log.include.messages": "true",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "true",
+        "value.converter.schemas.enable": "true",
+        "buffer.flush.time.ms": "10000",
+        "buffer.max.records": "10000",
+        "thread.pool.size": "2"
+    }
+}

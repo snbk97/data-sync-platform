@@ -1,4 +1,4 @@
-FROM altinity/clickhouse-sink-connector:2.9.0-lt
+FROM altinity/clickhouse-sink-connector:2.8.0-kafka
 
 # Reduce plugin scan overhead at Kafka Connect startup.
 # These artifacts are not needed at runtime for the MySQL -> ClickHouse sink flow.

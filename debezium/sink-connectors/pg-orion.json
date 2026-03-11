@@ -4,7 +4,7 @@
         "connector.class": "com.altinity.clickhouse.sink.connector.ClickHouseSinkConnector",
         "tasks.max": "1",
         "topics.regex": "pg_orion_mirror\\.public\\..*",
-        "clickhouse.server.url": "clickhouse",
+        "clickhouse.server.url": "host.docker.internal",
         "clickhouse.server.port": "8123",
         "clickhouse.server.user": "default",
         "clickhouse.server.password": "",

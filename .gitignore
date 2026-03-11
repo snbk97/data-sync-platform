@@ -1,5 +1,10 @@
 # Environment variables
 .env
 
+# Temporary files
+tmp
+.tmp
+
+
 # Binaries
 bin

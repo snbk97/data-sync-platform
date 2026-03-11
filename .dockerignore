@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.Example
+
+# Build artifacts
+bin
+tmp
+.tmp
+*.exe
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
+
+# Test and coverage
+*_test.go
+coverage.out
+*.test
+
+# Documentation (not needed in image build)
+*.md
+
+# Misc
+.DS_Store
+*.log

@@ -3,7 +3,10 @@
 services:
   # Zookeeper for Kafka
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
+    build:
+      context: .
+      dockerfile: deployments/zookeeper.Dockerfile
+    image: db-stream-zookeeper:local
     hostname: zookeeper
     container_name: db-stream-zookeeper
     ports:
@@ -24,7 +27,10 @@ services:
 
   # Kafka for event streaming
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    build:
+      context: .
+      dockerfile: deployments/kafka.Dockerfile
+    image: db-stream-kafka:local
     hostname: kafka
     container_name: db-stream-kafka
     depends_on:
@@ -59,7 +65,10 @@ services:
 
   # ClickHouse for analytics
   clickhouse:
-    image: clickhouse/clickhouse-server:23.8
+    build:
+      context: .
+      dockerfile: deployments/clickhouse.Dockerfile
+    image: db-stream-clickhouse:local
     hostname: clickhouse
     container_name: db-stream-clickhouse
     depends_on:
@@ -80,8 +89,6 @@ services:
       - db-stream-network
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      - ./clickhouse/config.d/zookeeper.xml:/etc/clickhouse-server/config.d/zookeeper.xml:ro
-      - ./clickhouse/users.d/experimental.xml:/etc/clickhouse-server/users.d/experimental.xml:ro
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping" ]
       interval: 30s
@@ -111,7 +118,10 @@ services:
   #     retries: 3
 
   mysql:
-    image: mariadb:10.11
+    build:
+      context: .
+      dockerfile: deployments/mysql.Dockerfile
+    image: db-stream-mysql:local
     hostname: mysql
     container_name: db-stream-mysql
     ports:
@@ -125,7 +135,6 @@ services:
       - db-stream-network
     volumes:
       - mysql-data:/var/lib/mysql
-    command: --server-id=1 --log-bin=mysql-bin --binlog-format=ROW # set this also in db--binlog_row_metadata=FULL ## this should persist on the db itself
     mem_limit: 256m
     healthcheck:
       test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
@@ -135,7 +144,10 @@ services:
 
   # Debezium Connector for CDC
   debezium:
-    image: debezium/connect:2.4
+    build:
+      context: .
+      dockerfile: deployments/debezium.Dockerfile
+    image: db-stream-debezium:local
     hostname: debezium
     container_name: db-stream-debezium
     depends_on:
@@ -205,7 +217,7 @@ services:
       - BOOTSTRAP_SERVERS=kafka:29092
       - KAFKA_BROKERS=kafka:29092
       - CLICKHOUSE_TOPICS_REGEX=(mysql_employee_mirror|pg_orion_mirror|pg_sirius_mirror)\..*
-      - DEBEZIUM_TOPIC_PREFIX=mysql_employee_mirror
+      # - DEBEZIUM_TOPIC_PREFIX=mysql_employee_mirror
       - REPLACINGMERGETREE_DELETE_COLUMN=__deleted
       - AUTO_CREATE_TABLES=true
       - SCHEMA_EVOLUTION=true
@@ -258,7 +270,10 @@ services:
   #       echo "All connectors submitted."
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    build:
+      context: .
+      dockerfile: deployments/kafka-ui.Dockerfile
+    image: db-stream-kafka-ui:local
     container_name: db-stream-kafka-ui
     depends_on:
       - kafka
@@ -268,6 +283,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: db-stream-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: 'true'
     networks:
       - db-stream-network
     restart: unless-stopped

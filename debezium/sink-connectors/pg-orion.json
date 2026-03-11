@@ -9,6 +9,7 @@
         "clickhouse.server.user": "default",
         "clickhouse.server.password": "",
         "clickhouse.server.database": "pg_orion_mirror",
+        "clickhouse.database.override.map": "orion:pg_orion_mirror",
         "auto.create.tables": "true",
         "schema.evolution": "true",
         "replacingmergetree.delete.column": "_sign",
